@@ -1,0 +1,46 @@
+#!/usr/bin/env ruby
+
+require 'tesla_api'
+require './lib/constants'
+
+security_out=`security find-generic-password -ga #{ENV['USER']} -s #{REFRESH_TOKEN_PATH} 2>&1`
+refresh_token=security_out.split("\n").filter{|a| a.include?("password")}.first.split(": ").last.gsub(/['"]/, "")
+
+tesla_api = TeslaApi::Client.new(refresh_token: refresh_token) 
+tesla_api.refresh_access_token
+
+def access_token_expired?
+  # https://stackoverflow.com/questions/238684/subtract-n-hours-from-a-datetime-in-ruby
+  tesla_api.expired? || (access_token_expires_at - 60.0/(24*60*60)) < DateTime.now)
+end
+
+vehicles = tesla_api.vehicles
+while true
+  begin
+    vehicles.each do | car|
+      tesla_api.refresh_access_token if access_token_expired?
+      charge_state = car.charge_state
+      p charge_state
+      charge_amps = charge_state['charger_actual_current']
+      target_charge_amps = charge_state['charge_current_request']
+      charge_volts = charge_state['charger_voltage']
+      state = charge_state['charging_state']
+      case state
+      when 'Charging'
+        if charge_volts < MINIMUM_VOLTS 
+          puts "Voltage is too low, skipping..."
+        elsif charge_amps < target_charge_amps
+          puts "Restarting charging. Dropped to: #{charge_amps}, wants: #{target_charge_amps}"
+          car.charge_stop 
+          sleep 10
+          car.charge_start
+        end
+      end
+    rescue Faraday::ServerError => e
+      $stderr.puts("Server error")
+      $stderr.puts(e)
+    end
+  end
+  sleep POLL_FREQUENCY_SECONDS
+end
+
