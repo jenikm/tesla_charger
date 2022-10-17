@@ -44,5 +44,5 @@ puts JSON.pretty_generate(parsed)
 
 refresh_token = parsed['refresh_token']
 
-system(*%W(security delete-generic-password -a #{ENV['USER']} -s #{REFRESH_TOKEN_PATH}))
-system(*%W(security add-generic-password -a #{ENV['USER']} -s #{REFRESH_TOKEN_PATH} -w '#{refresh_token}'))
+system(*%W(security delete-generic-password -a #{ENV['USER']} -s #{KEYCHAIN_REFRESH_TOKEN_PATH}))
+system(*%W(security add-generic-password -a #{ENV['USER']} -s #{KEYCHAIN_REFRESH_TOKEN_PATH} -w '#{refresh_token}'))

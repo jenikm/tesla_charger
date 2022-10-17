@@ -2,25 +2,30 @@
 
 require 'tesla_api'
 require './lib/constants'
+require 'logger'
 
-security_out=`security find-generic-password -ga #{ENV['USER']} -s #{REFRESH_TOKEN_PATH} 2>&1`
+logger = Logger.new('./logs/info.log')
+
+
+security_out=`security find-generic-password -ga #{ENV['USER']} -s #{KEYCHAIN_REFRESH_TOKEN_PATH} 2>&1`
 refresh_token=security_out.split("\n").filter{|a| a.include?("password")}.first.split(": ").last.gsub(/['"]/, "")
 
 tesla_api = TeslaApi::Client.new(refresh_token: refresh_token) 
 tesla_api.refresh_access_token
 
-def access_token_expired?
+def access_token_expired?(tesla_api)
   # https://stackoverflow.com/questions/238684/subtract-n-hours-from-a-datetime-in-ruby
-  tesla_api.expired? || (access_token_expires_at - 60.0/(24*60*60)) < DateTime.now)
+  tesla_api.expired? || (tesla_api.access_token_expires_at - 60.0/(24*60*60)) < DateTime.now
 end
 
 vehicles = tesla_api.vehicles
-while true
+puts "#{vehicles.length} vehicle found, monitoring..."
+loop do
   begin
-    vehicles.each do | car|
-      tesla_api.refresh_access_token if access_token_expired?
+    vehicles.each do | car |
+      tesla_api.refresh_access_token if access_token_expired?(tesla_api)
       charge_state = car.charge_state
-      p charge_state
+      logger.info(charge_state.inspect)
       charge_amps = charge_state['charger_actual_current']
       target_charge_amps = charge_state['charge_current_request']
       charge_volts = charge_state['charger_voltage']
