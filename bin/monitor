@@ -12,6 +12,7 @@ refresh_token=security_out.split("\n").filter{|a| a.include?("password")}.first.
 
 tesla_api = TeslaApi::Client.new(refresh_token: refresh_token) 
 tesla_api.refresh_access_token
+require 'pry';binding.pry 
 
 def access_token_expired?(tesla_api)
   # https://stackoverflow.com/questions/238684/subtract-n-hours-from-a-datetime-in-ruby
@@ -24,6 +25,8 @@ loop do
   begin
     vehicles.each do | car |
       tesla_api.refresh_access_token if access_token_expired?(tesla_api)
+      puts "vehicle data"
+      logger.info(car.vehicle_data.inspect)
       charge_state = car.charge_state
       logger.info(charge_state.inspect)
       charge_amps = charge_state['charger_actual_current']
@@ -40,8 +43,11 @@ loop do
           sleep 10
           car.charge_start
         end
+      when "Driving"
+        puts "Driving, exiting"
+        exit 0
       end
-    rescue Faraday::ServerError => e
+    rescue Faraday::ServerError, Faraday::ClientError => e
       $stderr.puts("Server error")
       $stderr.puts(e)
     end
